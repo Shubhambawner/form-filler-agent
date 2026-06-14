@@ -1,0 +1,204 @@
+{
+  "personal_details": {
+    "first_name": {
+      "value": "Shubham",
+      "description": "Legal first/given name of the applicant."
+    },
+    "last_name": {
+      "value": "Bawner",
+      "description": "Legal last/family name/surname of the applicant."
+    },
+    "full_name": {
+      "value": "Shubham Bawner",
+      "description": "Applicant's full name as it should appear on applications."
+    },
+    "email": {
+      "value": "shubhambawner.official@gmail.com",
+      "description": "Primary contact email address."
+    },
+    "phone": {
+      "value": "+91-7410730191",
+      "description": "Primary contact phone number, including country code."
+    },
+    "phone_country_code": {
+      "value": "+91",
+      "description": "Phone number country calling code (e.g. for split country-code/number fields)."
+    },
+    "address_line1": {
+      "value": "VNR Block 1, 31st Cross, Kaggadasapura Main Road, C V Raman Nagar",
+      "description": "Street address, line 1 (house/flat number and street name)."
+    },
+    "address_line2": {
+      "value": "",
+      "description": "Street address, line 2 (apartment, suite, unit - optional)."
+    },
+    "city": {
+      "value": "Bengaluru",
+      "description": "City of current residence."
+    },
+    "state_region": {
+      "value": "Karnataka",
+      "description": "State, province, or region of current residence."
+    },
+    "postal_code": {
+      "value": "560093",
+      "description": "Postal or ZIP code of current residence."
+    },
+    "country": {
+      "value": "India",
+      "description": "Country of current residence."
+    },
+    "linkedin_url": {
+      "value": "https://www.linkedin.com/in/shubham-bawner-456131205/",
+      "description": "Full URL to LinkedIn profile."
+    },
+    "github_url": {
+      "value": "https://github.com/Shubhambawner/",
+      "description": "Full URL to GitHub profile."
+    },
+    "portfolio_url": {
+      "value": "https://leetcode.com/u/noob_man_101/",
+      "description": "Full URL to personal portfolio or website."
+    },
+    "current_employer": {
+      "value": "Texas Instruments",
+      "description": "Name of current employer/company."
+    },
+    "current_title": {
+      "value": "Software Engineer",
+      "description": "Current job title/role."
+    },
+    "current_location": {
+      "value": "Bengaluru, India",
+      "description": "City/country where the applicant currently works."
+    },
+    "years_of_experience": {
+      "value": "2",
+      "description": "Total years of professional software engineering experience."
+    },
+    "professional_summary": {
+      "value": "Backend and distributed systems engineer at Texas Instruments, designing AI-native agentic systems and robust, scalable backend services. Owns Spring Boot services for customer support systems handling 80K+ monthly requests and an agentic support routing system saving 7K+ hours annually.",
+      "description": "Short professional summary / objective statement for cover letters or 'About You' fields."
+    },
+    "skills_summary": {
+      "value": "Java, Python, JavaScript, SQL, FastAPI, Spring Boot, LlamaIndex, Oracle SQL, PostgreSQL, MS SQL, MongoDB, Redis, RabbitMQ, Docker, Jenkins, Git, Elasticsearch, Distributed Systems, Async Messaging, Microservices, LLM Integration, RAG, Vector Search, AWS",
+      "description": "Comma-separated list of key technical skills and technologies."
+    },
+    "highest_education_level": {
+      "value": "Bachelor's Degree",
+      "description": "Highest level of education completed (e.g. Bachelor's, Master's, PhD)."
+    },
+    "university": {
+      "value": "National Institute of Technology, Raipur",
+      "description": "Name of the university/college attended for the highest degree."
+    },
+    "degree": {
+      "value": "Bachelor of Technology",
+      "description": "Degree type obtained (e.g. Bachelor of Technology, Bachelor of Science)."
+    },
+    "major": {
+      "value": "Information Technology",
+      "description": "Field of study / major for the highest degree."
+    },
+    "graduation_date": {
+      "value": "2024-07",
+      "description": "Graduation date (year-month) for the highest degree."
+    },
+    "gpa": {
+      "value": "8.20/10",
+      "description": "Grade point average / CGPA for the highest degree, with scale."
+    },
+    "resume_file_path": {
+      "value": "D:\\autobrowser\\candidateinfo\\resume.pdf",
+      "description": "Absolute local file path to the resume PDF/DOCX used for file-upload fields."
+    },
+    "cover_letter_file_path": {
+      "value": "",
+      "description": "Absolute local file path to a cover letter file, if required by the application. Left blank - no cover letter on file."
+    },
+    "profile_photo_path": {
+      "value": "D:\\autobrowser\\candidateinfo\\profile.jpg",
+      "description": "Absolute local file path to a profile/headshot photo, used by ATS forms that request a candidate photo upload."
+    },
+    "work_authorization": {
+      "value": "Authorized to work in India (Indian citizen); would require visa sponsorship for roles outside India",
+      "description": "Description of the applicant's legal work authorization status for the country the job is in."
+    },
+    "require_sponsorship": {
+      "value": "No",
+      "description": "Whether the applicant will now or in the future require visa sponsorship to work in the job's country."
+    },
+    "willing_to_relocate": {
+      "value": "Yes",
+      "description": "Whether the applicant is willing to relocate for this role."
+    },
+    "desired_salary": {
+      "value": "30 LPA INR",
+      "description": "Expected salary or compensation range."
+    },
+    "notice_period": {
+      "value": "2 months",
+      "description": "Notice period required before the applicant can start a new role."
+    },
+    "earliest_start_date": {
+      "value": "Negotiable",
+      "description": "Earliest date the applicant can start the new role."
+    },
+    "how_did_you_hear": {
+      "value": "Company Website",
+      "description": "Default answer for 'How did you hear about this position?' style questions."
+    },
+    "eeo_gender": {
+      "value": "Male",
+      "description": "Default answer for voluntary EEO/diversity gender self-identification questions."
+    },
+    "eeo_race_ethnicity": {
+      "value": "Asian",
+      "description": "Default answer for voluntary EEO/diversity race/ethnicity self-identification questions."
+    },
+    "eeo_veteran_status": {
+      "value": "I am not a protected veteran",
+      "description": "Default answer for voluntary veteran status self-identification questions."
+    },
+    "eeo_disability_status": {
+      "value": "No, I do not have a disability",
+      "description": "Default answer for voluntary disability status self-identification questions."
+    },
+    "consent_data_processing": {
+      "value": "Yes",
+      "description": "Default answer ('Yes' / 'I agree' / 'I consent') for consent-to-process-personal-data declarations required by application forms."
+    },
+    "confirm_information_accurate": {
+      "value": "Yes",
+      "description": "Default answer ('Yes' / 'I agree' / 'I certify') for 'I certify/confirm that the information provided in this application is true and accurate' declarations."
+    },
+    "consent_sms_updates": {
+      "value": "Yes",
+      "description": "Default answer for optional consent to receive SMS/text message updates about this application's status."
+    },
+    "phone_number_without_code": {
+      "value": "7410730191",
+      "description": "Primary contact phone number, without country code, derived from 'phone'."
+    },
+    "ai_workflows_deployed_count": {
+      "value": "1",
+      "description": "Inferred from professional summary mentioning one 'agentic support routing system' owned by the candidate."
+    },
+    "llm_usage_frequency": {
+      "value": "Daily",
+      "description": "Inferred from professional summary mentioning 'designing AI-native agentic systems'."
+    },
+    "ai_coding_tool_usage_frequency": {
+      "value": "Daily",
+      "description": "Inferred from the candidate's professional summary which highlights work on AI-native agentic systems, suggesting frequent use of AI tools in development."
+    },
+    "has_deployed_production_ai_system": {
+      "value": "Yes",
+      "description": "Inferred from professional summary, which states ownership of a deployed 'agentic support routing system'."
+    },
+    "ai_coding_tools_used": {
+      "value": "Claude (Anthropic), Cursor, GitHub Copilot",
+      "description": "TEMP best-guess value for verification testing - revert to TODO before real submission. The specific AI coding tools and models used by the candidate are not detailed in the profile registry."
+    }
+  }
+}

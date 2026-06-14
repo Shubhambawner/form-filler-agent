@@ -1,0 +1,11 @@
+# Google Gemini SDK
+google-genai>=1.0.0
+
+# Official Model Context Protocol SDK
+mcp>=1.0.0
+
+# Playwright Base Package
+playwright>=1.42.0
+
+# Environment Variable Management
+python-dotenv>=1.0.0
