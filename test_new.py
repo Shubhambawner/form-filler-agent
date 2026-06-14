@@ -22,8 +22,8 @@ async def main():
     print(f"--- Starting Form Filler System ---")
     print(f"Target: {target_link}")
     
-    # Run the executor loop
-    result = await process_form(target_link)
+    # Run the executor loop (always discard any cached flow and regenerate)
+    result = await process_form(target_link, force_refresh=True)
     
     # If a self-healing event happened, rerun the execution phase with the updated flow
     if result["status"] == "healed_needs_restart":

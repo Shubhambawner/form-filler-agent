@@ -38,6 +38,13 @@ def get_cached_flow(domain: str) -> list:
         return json.loads(row['mcp_tool_sequence'])
     return None
 
+def delete_flow(domain: str):
+    """Removes a cached flow for a domain, forcing regeneration on next run."""
+    conn = get_db_connection()
+    conn.execute('DELETE FROM cached_flows WHERE domain = ?', (domain,))
+    conn.commit()
+    conn.close()
+
 def save_flow(domain: str, mcp_tool_sequence: list):
     """Saves or overwrites a flow sequence."""
     conn = get_db_connection()
