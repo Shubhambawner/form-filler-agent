@@ -1,5 +1,23 @@
 import re
 
+
+def _normalize(s: str) -> str:
+    return re.sub(r"\s+", " ", (s or "")).strip().lower()
+
+
+def _values_match(actual: str, expected: str) -> bool:
+    """Loose comparison used to verify an action actually took effect.
+    Tolerates UI-applied formatting (e.g. phone numbers, currency) by also
+    comparing with non-alphanumeric characters stripped."""
+    a, e = _normalize(actual), _normalize(expected)
+    if not a or not e:
+        return False
+    if e in a or a in e:
+        return True
+    a2, e2 = re.sub(r"[^a-z0-9]", "", a), re.sub(r"[^a-z0-9]", "", e)
+    return bool(e2) and (e2 in a2 or a2 in e2)
+
+
 def is_final_submit(action: dict) -> bool:
     """
     Evaluates if an action is likely the final form submission button click.

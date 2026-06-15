@@ -22,12 +22,25 @@ def build_system_prompt(target_url: str, snapshot: str, previous_actions: list =
 
     ### ACTION SCHEMA ###
     Return a JSON array of action objects, each shaped like:
-      {{"action": "fill" | "click" | "select" | "check" | "uncheck" | "upload", "role": "<ARIA role from the snapshot, e.g. textbox, button, combobox, checkbox>", "name": "<exact accessible name from the snapshot>", "value": "<text to fill / option to select / absolute file path to upload>", "nth": <optional 0-based index>}}
+      {{"action": "fill" | "select" | "combobox_select" | "click" | "check" | "uncheck" | "upload", "role": "<ARIA role from the snapshot, e.g. textbox, button, combobox, checkbox>", "name": "<exact accessible name from the snapshot>", "value": "<text to fill / option to select / absolute file path to upload>", "nth": <optional 0-based index>}}
     "value" is omitted for "click", "check", and "uncheck" actions.
     "nth" is optional and only needed when MULTIPLE elements in the snapshot share the exact same
     role and accessible name (e.g. two "Drop or select..." upload buttons, one for resume and one
     for cover letter). Count occurrences of that (role, name) pair in top-to-bottom document order
     starting at 0, and set "nth" to the index of the one you mean.
+
+    ### ACTION TYPE GUIDE ###
+    - "fill": type text into a "textbox" or "textarea".
+    - "select": choose an option in a NATIVE HTML <select> dropdown.
+    - "combobox_select": choose an option in a CUSTOM/searchable dropdown widget (role "combobox"
+      that is not a native <select>, e.g. a react-select style picker). A specialist sub-agent
+      figures out exactly how to operate the widget and which option to pick.
+    - "click": click a button, link, radio button, or toggle.
+    - "check" / "uncheck": set a checkbox's state.
+    - "upload": attach a file via a file-picker button.
+    For any "combobox"-role element, prefer "combobox_select". If you are not sure whether a
+    dropdown is native or custom, guess "select" first -- if the ERROR RECOVERY section later shows
+    it failed, retry with "combobox_select" (or vice versa).
 
     ### RULES ###
     1. ONLY reference elements that literally appear in the CURRENT SNAPSHOT below, using their exact role and accessible name.
@@ -35,12 +48,25 @@ def build_system_prompt(target_url: str, snapshot: str, previous_actions: list =
     3. Use the Profile Data below to fill in field values. Skip a field only if the snapshot shows it
        already holds the value implied by the Profile Data. A field showing a default or placeholder
        value that does NOT match the Profile Data (e.g. a country-code selector defaulting to a
-       different country than the candidate's location) is NOT "already correctly filled" -- it must
-       still be corrected.
-    4. Do not repeat any action already listed under "Actions already executed".
-    5. If every visible field is filled and there is a "Next" / "Continue" / "Save and continue" style button, include a click on it as the LAST action in the array.
-    6. If you see the FINAL submission button for the entire application (e.g. "Submit Application", "Submit", "Apply", "Finish"), include a click on it as the LAST action and nothing after it.
-    7. If there is nothing left to do on this page and no button to advance, return an empty JSON array [].
+       different country than the candidate's location, or a dropdown still showing "Select...")
+       is NOT "already correctly filled" -- it must still be corrected.
+    4. Do not repeat any action already listed under "Actions already executed" UNLESS the CURRENT
+       SNAPSHOT shows that field is STILL empty or showing a placeholder/default value -- in that
+       case your previous attempt did not stick, and you MUST retry it using a DIFFERENT action type
+       than the one that didn't stick (e.g. "combobox_select" instead of "select" or "fill").
+    5. Scan the ENTIRE CURRENT SNAPSHOT for every field that is empty, blank, or shows a
+       placeholder/default value, and include an action for EACH one you find. Do this on every
+       turn -- never assume a field is done just because you acted on it in a previous turn; verify
+       against the CURRENT SNAPSHOT.
+    6. After accounting for the actions above: if every field on this page is correctly filled and
+       there is a "Next" / "Continue" / "Save and continue" style button, include a click on it as
+       the LAST action in the array.
+    7. ONLY when every field on this page is correctly filled AND the single remaining step is the
+       FINAL submission button for the entire application (e.g. "Submit Application", "Submit",
+       "Apply", "Finish"), return a JSON array containing EXACTLY ONE action: the click on that
+       button, and nothing else.
+    8. If there is truly nothing left to do on this page (no empty/placeholder fields, and no
+       button to advance), return an empty JSON array [].
 
     ### PROFILE DATA ###
     {json.dumps(PROFILE_DATA, indent=2)}
@@ -53,7 +79,7 @@ def build_system_prompt(target_url: str, snapshot: str, previous_actions: list =
     Format Example:
     [
       {{"action": "fill", "role": "textbox", "name": "First Name", "value": "Alex"}},
-      {{"action": "select", "role": "combobox", "name": "Country", "value": "India"}},
+      {{"action": "combobox_select", "role": "combobox", "name": "Country", "value": "India"}},
       {{"action": "check", "role": "checkbox", "name": "I acknowledge"}},
       {{"action": "click", "role": "button", "name": "Next"}}
     ]
@@ -69,17 +95,21 @@ def build_system_prompt(target_url: str, snapshot: str, previous_actions: list =
     if error_context:
         prompt += f"""
         \n### ERROR RECOVERY ###
-        The following actions failed when executed against the page:
+        The following actions failed when executed against the page (for "select"/
+        "combobox_select" actions, a specialist already exhausted its ideas for operating the
+        widget -- the error is the specialist's own explanation, often listing the real
+        available options. For other action types, "still shows ... after ..." means your
+        chosen value did not stick):
         {json.dumps(error_context['failedActions'], indent=2)}
 
         Re-examine the CURRENT SNAPSHOT above (it reflects the page's current state). For EVERY
-        failed action listed above, you MUST include a corrected action in your response that
-        achieves the same goal via a different approach (e.g. a different "action" type, such as
-        "click" or "fill" instead of "select", or a different target element) -- UNLESS the
-        corresponding field is genuinely no longer present, already correctly filled, or no
-        longer relevant in the CURRENT SNAPSHOT. Do not silently drop any failed action, and do
-        not repeat any failed action verbatim if the element it referenced no longer matches the
-        snapshot.
+        failed action listed above, you MUST include a corrected action in your response --
+        UNLESS the corresponding field is genuinely no longer present, already correctly filled,
+        or no longer relevant in the CURRENT SNAPSHOT. For "select"/"combobox_select" failures,
+        prefer trying a different VALUE closer to one of the field's real options (the error
+        often lists them); for other action types, try a different "action" type or target
+        element. Do not silently drop any failed action, and do not repeat any failed action
+        verbatim if the element it referenced no longer matches the snapshot.
         """
     return prompt
 

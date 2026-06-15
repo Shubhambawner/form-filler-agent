@@ -21,14 +21,19 @@ class RunLogger:
         self._iteration += 1
         return self._iteration
 
+    @staticmethod
+    def _label(iteration) -> str:
+        return f"{iteration:02d}" if isinstance(iteration, int) else str(iteration)
+
     def log_snapshot(self, iteration: int, snapshot: str):
-        path = os.path.join(self.snapshots_dir, f"iter_{iteration:02d}.txt")
+        path = os.path.join(self.snapshots_dir, f"iter_{self._label(iteration)}.txt")
         with open(path, "w", encoding="utf-8") as f:
             f.write(snapshot)
 
-    def log_llm_call(self, iteration: int, prompt: str, response_text: str, usage: dict):
-        prompt_path = os.path.join(self.llm_dir, f"iter_{iteration:02d}_prompt.txt")
-        response_path = os.path.join(self.llm_dir, f"iter_{iteration:02d}_response.json")
+    def log_llm_call(self, iteration, prompt: str, response_text: str, usage: dict):
+        label = self._label(iteration)
+        prompt_path = os.path.join(self.llm_dir, f"iter_{label}_prompt.txt")
+        response_path = os.path.join(self.llm_dir, f"iter_{label}_response.json")
 
         with open(prompt_path, "w", encoding="utf-8") as f:
             f.write(prompt)

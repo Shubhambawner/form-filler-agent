@@ -6,9 +6,9 @@ from dotenv import load_dotenv
 # GEMINI_API_KEY at import time (overrides stale system env vars)
 load_dotenv(override=True)
 
-from src.db import init_db
+from src.db import init_db, delete_recipe
 from src.executor import process_form
-from test_inputs import TARGET_URL, TEST_DOMAIN
+from test_inputs import TARGET_URL, TEST_DOMAIN, SELECT_FIELDS
 
 
 async def main():
@@ -17,18 +17,21 @@ async def main():
         print("ERROR: GEMINI_API_KEY not found. Please ensure your .env file exists in the root directory.")
         return
 
-    print(f"--- Cached flow replay (isolated cache: {TEST_DOMAIN}) ---")
+    # force_refresh=True clears the TEST_DOMAIN flow cache; also clear the
+    # TEST_DOMAIN select-recipe cache for each field so resolve() can't take
+    # its exact-cache-hit shortcut and must run discover() fresh.
+    for role, name, _value, _nth in SELECT_FIELDS:
+        delete_recipe(TEST_DOMAIN, role, name)
+
+    print(f"--- Full discovery test (isolated cache: {TEST_DOMAIN}) ---")
     print(f"Target: {TARGET_URL}")
 
-    # Replay the flow cached by test_select_cached.py -- no force_refresh, so
-    # this exercises the pure cached-flow replay path (no agent/selector calls
-    # expected at all).
-    result = await process_form(TARGET_URL, cache_domain=TEST_DOMAIN)
+    result = await process_form(TARGET_URL, force_refresh=True, cache_domain=TEST_DOMAIN)
     if result["status"] == "healed_needs_restart":
         print("--- Restarting with Healed Flow ---")
         result = await process_form(TARGET_URL, cache_domain=TEST_DOMAIN)
 
-    print(f"--- Replay Result: {result['status']} ---")
+    print(f"--- Discovery Result: {result['status']} ---")
 
 
 if __name__ == "__main__":
