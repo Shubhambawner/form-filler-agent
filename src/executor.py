@@ -1,14 +1,21 @@
 import os
-from .db import get_cached_flow, save_flow, delete_flow
-from .utils import is_final_submit, flow_has_final_submit
+from .db import find_best_flow, save_flow_variant
+from .utils import is_final_submit, flow_has_final_submit, extract_field_signature
 from .agent import run_react_agent
 from .browser_client import BrowserClient
 from .run_logger import RunLogger
 from .select_strategies import NeedsSelectorAgent, RecipeFailed
 from . import selector_agent
+from . import embeddings
 
 MAX_DISCOVERY_ITERATIONS = 20
 DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'data')
+
+# How similar a freshly-(re)discovered flow's initial-page embedding must be
+# to an existing variant's for it to be treated as an update to THAT variant
+# (a genuine dev-side change to the same listing) rather than a new variant
+# (a different listing/template with a different field set).
+SAME_VARIANT_THRESHOLD = 0.97
 
 async def process_form(url: str, force_refresh: bool = False, cache_domain: str = None):
     domain = url.split("//")[-1].split("/")[0]
@@ -19,12 +26,6 @@ async def process_form(url: str, force_refresh: bool = False, cache_domain: str 
     # don't read/clear/overwrite the real cached data for this site.
     cache_key = cache_domain or domain
 
-    if force_refresh:
-        print(f"[Executor] Force refresh requested. Clearing cached flow for {cache_key}...")
-        delete_flow(cache_key)
-
-    flow_sequence = get_cached_flow(cache_key)
-
     logger = RunLogger(domain, DATA_DIR)
     print(f"[Executor] Logging this request's artifacts to {logger.run_dir}")
 
@@ -34,12 +35,34 @@ async def process_form(url: str, force_refresh: bool = False, cache_domain: str 
     try:
         await browser.navigate(url)
 
-        # 1. Discovery Phase (if no cache exists)
+        # Snapshot the page before any actions, and embed its form-field
+        # shape. This is both the retrieval key (find the stored flow variant
+        # whose starting page looked most like this one) and the storage key
+        # for whatever flow this run ends up producing/updating.
+        initial_snapshot = await browser.snapshot()
+        query_embedding = embeddings.embed_text(extract_field_signature(initial_snapshot))
+
+        # `force_refresh` skips retrieval/replay entirely and runs fresh
+        # discovery; the save step below still dedupes against existing
+        # variants, so this updates the matching variant in place rather than
+        # piling up duplicates when re-run against the same listing.
+        flow_match = None if force_refresh else find_best_flow(cache_key, query_embedding)
+        flow_sequence = flow_match["mcp_tool_sequence"] if flow_match else None
+
+        def save_variant(new_flow):
+            existing = find_best_flow(cache_key, query_embedding)
+            update_id = existing["id"] if existing and existing["similarity"] >= SAME_VARIANT_THRESHOLD else None
+            save_flow_variant(cache_key, initial_snapshot, query_embedding, new_flow, update_id=update_id)
+
+        # 1. Discovery Phase (if no matching cached flow variant exists)
         if not flow_sequence:
-            print(f"[Executor] No cached flow for {cache_key}. Handing to Agent...")
+            if force_refresh:
+                print(f"[Executor] Force refresh requested for {cache_key}. Running fresh discovery...")
+            else:
+                print(f"[Executor] No matching cached flow variant for {cache_key}. Handing to Agent...")
             flow_sequence = await discover_flow(browser, url, cache_key, logger)
             if flow_has_final_submit(flow_sequence):
-                save_flow(cache_key, flow_sequence)
+                save_variant(flow_sequence)
             else:
                 print(f"[Executor] Generated flow has no final submit step; not caching.")
             return {"status": "dry_run_complete" if flow_has_final_submit(flow_sequence) else "discovery_incomplete"}
@@ -60,7 +83,7 @@ async def process_form(url: str, force_refresh: bool = False, cache_domain: str 
             healed_tail = await discover_flow(browser, url, cache_key, logger, error_context=error_context)
             new_flow = executed + healed_tail
             if flow_has_final_submit(new_flow):
-                save_flow(cache_key, new_flow)
+                save_variant(new_flow)
             else:
                 print(f"[Executor] Healed flow has no final submit step; not caching.")
 
@@ -90,7 +113,8 @@ async def process_form(url: str, force_refresh: bool = False, cache_domain: str 
                     updated_action = {**action, "recipe": result["recipe"], "chosen_label": result["chosen_label"],
                                        "description": result["description"], "expected_failure": False}
                     executed.append(updated_action)
-                    save_flow(cache_key, executed + flow_sequence[i + 1:])
+                    save_flow_variant(cache_key, initial_snapshot, query_embedding,
+                                       executed + flow_sequence[i + 1:], update_id=flow_match["id"])
                     continue
 
                 await self_heal(action, result["error"], i + 1)

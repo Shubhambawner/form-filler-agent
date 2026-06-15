@@ -9,9 +9,16 @@ reasoning.
 
 1. `executor.process_form(url, force_refresh=False, cache_domain=None)` is
    the single entry point.
-2. **Cache lookup**: `cache_key = cache_domain or domain` (see "Cache
-   isolation" below). If a `cached_flows` row exists for `cache_key` and
-   `force_refresh` is False, go to **Replay**. Otherwise go to **Discovery**.
+2. **Snapshot + cache lookup**: immediately after `navigate()`, before any
+   action, capture `initial_snapshot = browser.snapshot()` and
+   `query_embedding = embeddings.embed_text(extract_field_signature(initial_snapshot))`.
+   `cache_key = cache_domain or domain` (see "Cache isolation" below). Unless
+   `force_refresh`, `db.find_best_flow(cache_key, query_embedding)` returns the
+   stored flow **variant** whose own initial-snapshot embedding is closest to
+   this one (or `None` if `cache_key` has no variants yet). If a variant is
+   found, go to **Replay** with its `mcp_tool_sequence`. Otherwise (or if
+   `force_refresh`) go to **Discovery**. See "Flow variants" below for why
+   there can be more than one row per domain and how saves are deduped.
 3. **Discovery** (`executor.discover_flow`): a ReAct loop --
    - snapshot the page (`browser.snapshot()`, full-page ARIA tree)
    - `agent.run_react_agent()` (Gemini) returns a JSON array of actions for
@@ -26,7 +33,7 @@ reasoning.
      final-submit click, or an empty batch, or `MAX_DISCOVERY_ITERATIONS`
      (20) is hit
    - on success (`flow_has_final_submit`), the whole `flow_sequence` is
-     persisted via `db.save_flow(cache_key, flow_sequence)`
+     persisted as a flow variant (see "Flow variants" below)
 4. **Replay** (`executor.process_form`'s replay loop): re-executes
    `flow_sequence` step by step via `browser.execute_action`. Steps tagged
    `expected_failure: true` are skipped (they failed during discovery too, by
@@ -103,7 +110,9 @@ reasoning.
 - **`utils.py`** -- `_normalize` (whitespace/case fold), `_values_match`
   (loose substring/alnum-stripped comparison used everywhere to verify an
   action "stuck"), `is_final_submit` / `flow_has_final_submit` (regex over
-  button names, excluding "next/continue/back").
+  button names, excluding "next/continue/back"), `extract_field_signature`
+  (snapshot -> one `"role: name"` line per form field, for flow-variant
+  embeddings -- see "Flow variants" below).
 - **`executor.py`** -- orchestration. `process_form` (entry point) and
   `discover_flow` (the discovery ReAct loop), described above.
 
@@ -172,9 +181,14 @@ sequence is cached and replayed directly next time (`run_recipe()`).
 
 ## Database (`data/flows.db`, `src/db.py`)
 
-- **`cached_flows`**: `domain UNIQUE`, `mcp_tool_sequence` (JSON list of
-  actions, the full discovery transcript), `last_updated`.
-  `get_cached_flow` / `save_flow` / `delete_flow`.
+- **`cached_flows`**: NOT unique on `domain` -- a domain (`cache_key`) can
+  have multiple **variant** rows. Columns: `domain`, `initial_snapshot` (raw
+  ARIA snapshot captured right after `navigate()`, before any actions),
+  `embedding` (JSON float list, of `extract_field_signature(initial_snapshot)`),
+  `mcp_tool_sequence`, `success_count`, `last_updated`.
+  `find_best_flow(domain, embedding)` / `save_flow_variant(domain,
+  initial_snapshot, embedding, mcp_tool_sequence, update_id=None)` /
+  `delete_flow(domain)` (deletes ALL variants for that domain).
 - **`select_recipes`**: `UNIQUE(domain, role, name)`. Columns: `signature`,
   `value` (the value this recipe was discovered FOR), `recipe` (JSON list of
   primitive ops), `chosen_label`, `description` (plain-language, also the
@@ -186,6 +200,48 @@ sequence is cached and replayed directly next time (`run_recipe()`).
   `select_recipes` rows. `domain` restricts to exact-domain rows (same-site
   hints); `exclude_base_domain` excludes all `#`-suffixed namespaces of that
   base domain (cross-site hints).
+
+### Flow variants
+
+A single ATS domain (e.g. `job-boards.greenhouse.io`) hosts many job
+listings, and customizable ATSs let different vendors/listings have different
+field sets on otherwise-identical templates. Pre-variant caching kept exactly
+one `cached_flows` row per domain and overwrote it on every heal -- if listing
+L1's flow healed itself to fit L2, then L1 reappeared, it would re-heal back,
+ping-ponging forever and never converging.
+
+Now each discovered/healed flow is stored as its own row (a "variant"),
+keyed by the page's `initial_snapshot`/`embedding` from the moment it was
+captured (before any actions). `extract_field_signature()` (in `utils.py`)
+reduces a snapshot to one `"role: name"` line per form field
+(textbox/combobox/checkbox/radio/etc.), dropping headings/buttons/static text
+that's typically identical across variants of the same template -- this is
+what gets embedded. Embeddings (not exact-string/Jaccard matching) are used
+deliberately: ATS templates often interpolate the job title into a field's
+accessible name (e.g. "...as a DevRel Engineer?" vs "...as a Backend
+Engineer?"), and embeddings are robust to that substitution while still being
+sensitive to genuinely different field sets.
+
+**Retrieval**: `find_best_flow(cache_key, query_embedding)` returns the
+highest-cosine-similarity variant for `cache_key`, or `None` if none exist.
+No similarity floor in v1 -- even a poor match is attempted, and a mismatch
+just triggers the normal self-heal path.
+
+**Save dedup** (`process_form`'s local `save_variant()`, used after both
+fresh discovery and self-heal): re-runs `find_best_flow` with this request's
+`query_embedding`. If the closest existing variant's similarity >=
+`SAME_VARIANT_THRESHOLD` (0.97), `save_flow_variant(..., update_id=that_id)`
+overwrites it in place (the "page had a minor dev-side change, re-heal the
+SAME listing" case). Otherwise it inserts a new row (the "different
+listing/template with a different field set" case) -- this is what breaks the
+L1/L2 ping-pong, since L1 and L2 each converge to their own variant row.
+Field-level recipe re-discovery during replay (a `RecipeFailed` resolved
+without a full heal) updates the matched variant in place directly via its
+known `id` (`flow_match["id"]`) -- the page didn't change, just one recipe.
+
+`force_refresh=True` no longer pre-deletes anything; it just skips retrieval
+and runs fresh discovery, then the same save-dedup decides whether to update
+an existing variant in place or insert a new one.
 
 ### Cache isolation (`cache_domain` param)
 

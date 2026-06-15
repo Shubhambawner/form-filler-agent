@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 # GEMINI_API_KEY at import time (overrides stale system env vars)
 load_dotenv(override=True)
 
-from src.db import init_db, delete_recipe
+from src.db import init_db, delete_recipe, get_recipe
 from src.browser_client import BrowserClient
 from src.run_logger import RunLogger
 from src.select_strategies import NeedsSelectorAgent, RecipeFailed
@@ -99,6 +99,14 @@ async def main():
     try:
         await browser.navigate(TARGET_URL)
         discovered = await discover_part(browser, logger)
+
+        print("\n--- DB checks ---")
+        for role, name, _value, _nth in FIELDS:
+            recipe = get_recipe(TEST_DOMAIN, role, name)
+            assert recipe is not None, f"expected a select_recipes row for {role} '{name}'"
+            assert recipe["recipe"], f"select_recipes row for {role} '{name}' missing recipe"
+            assert recipe["embedding"], f"select_recipes row for {role} '{name}' missing embedding"
+            print(f"  select_recipes: {role} '{name}' -> {len(recipe['recipe'])} op(s), value={recipe['value']!r}")
 
         await browser.screenshot(os.path.join(logger.run_dir, "after_discover.png"))
 

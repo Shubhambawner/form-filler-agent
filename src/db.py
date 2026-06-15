@@ -16,14 +16,29 @@ def init_db():
     """Initializes the SQLite schema."""
     conn = get_db_connection()
     conn.execute('DROP TABLE IF EXISTS select_strategies')
+
+    # Pre-variant-caching `cached_flows` had `UNIQUE(domain)` and no
+    # snapshot/embedding columns -- a single row per domain that healing
+    # would overwrite. There's no way to retrofit those old rows with an
+    # initial snapshot, so drop and recreate; flows simply get rediscovered
+    # (and cached as the first variant) on next use.
+    cursor = conn.execute("PRAGMA table_info(cached_flows)")
+    existing_cols = [row[1] for row in cursor.fetchall()]
+    if existing_cols and "embedding" not in existing_cols:
+        conn.execute('DROP TABLE cached_flows')
+
     conn.execute('''
         CREATE TABLE IF NOT EXISTS cached_flows (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            domain TEXT UNIQUE NOT NULL,
+            domain TEXT NOT NULL,
+            initial_snapshot TEXT NOT NULL,
+            embedding TEXT NOT NULL,
             mcp_tool_sequence TEXT NOT NULL,
+            success_count INTEGER DEFAULT 1,
             last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_cached_flows_domain ON cached_flows(domain)')
     conn.execute('''
         CREATE TABLE IF NOT EXISTS select_recipes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,20 +59,62 @@ def init_db():
     conn.commit()
     conn.close()
 
-def get_cached_flow(domain: str) -> list:
-    """Retrieves a cached flow as a Python list of dictionaries."""
+def find_best_flow(domain: str, embedding: list) -> dict:
+    """Returns the cached flow variant for `domain` whose initial-page-snapshot
+    embedding is most similar (cosine) to `embedding`, or None if no variants
+    are stored for this domain yet.
+
+    A "variant" is one row: a (initial_snapshot, mcp_tool_sequence) pair
+    captured when that flow was discovered/healed. Different job
+    listings/vendors under the same ATS domain can have different field sets
+    and get their own variant rows instead of overwriting each other; this
+    picks whichever stored variant's starting page looked most like the
+    current one. Brute-force in Python -- fine at this scale."""
+    from . import embeddings
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT mcp_tool_sequence FROM cached_flows WHERE domain = ?', (domain,))
-    row = cursor.fetchone()
+    cursor.execute('SELECT * FROM cached_flows WHERE domain = ?', (domain,))
+    rows = cursor.fetchall()
     conn.close()
-    
-    if row:
-        return json.loads(row['mcp_tool_sequence'])
-    return None
+
+    if not rows:
+        return None
+
+    best_row, best_similarity = None, -1.0
+    for row in rows:
+        row_embedding = json.loads(row["embedding"])
+        similarity = embeddings.cosine_similarity(embedding, row_embedding)
+        if similarity > best_similarity:
+            best_row, best_similarity = row, similarity
+
+    result = dict(best_row)
+    result["mcp_tool_sequence"] = json.loads(result["mcp_tool_sequence"])
+    result["embedding"] = json.loads(result["embedding"])
+    result["similarity"] = best_similarity
+    return result
+
+def get_flow_variants(domain: str) -> list:
+    """Returns all cached flow variant rows for `domain` (id, success_count,
+    last_updated, initial_snapshot, plus parsed mcp_tool_sequence/embedding),
+    ordered by id. Mainly for test/debug inspection of how many variants
+    exist and whether a save updated one in place vs. inserted a new one."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM cached_flows WHERE domain = ? ORDER BY id', (domain,))
+    rows = cursor.fetchall()
+    conn.close()
+
+    results = []
+    for row in rows:
+        result = dict(row)
+        result["mcp_tool_sequence"] = json.loads(result["mcp_tool_sequence"])
+        result["embedding"] = json.loads(result["embedding"])
+        results.append(result)
+    return results
 
 def delete_flow(domain: str):
-    """Removes a cached flow for a domain, forcing regeneration on next run."""
+    """Removes all cached flow variants for a domain, forcing regeneration on next run."""
     conn = get_db_connection()
     conn.execute('DELETE FROM cached_flows WHERE domain = ?', (domain,))
     conn.commit()
@@ -70,13 +127,29 @@ def delete_recipe(domain: str, role: str, name: str):
     conn.commit()
     conn.close()
 
-def save_flow(domain: str, mcp_tool_sequence: list):
-    """Saves or overwrites a flow sequence."""
+def save_flow_variant(domain: str, initial_snapshot: str, embedding: list, mcp_tool_sequence: list,
+                       update_id: int = None):
+    """Stores `mcp_tool_sequence` as a flow variant for `domain`, keyed off
+    the page's `initial_snapshot`/`embedding` captured before any actions.
+
+    If `update_id` is given, overwrites that existing variant row in place
+    (the "page changed slightly, re-heal the same listing" case). Otherwise
+    inserts a new variant row (the "different listing/template with a
+    different field set" case) -- this is what lets multiple variants coexist
+    under one domain instead of repeatedly overwriting each other."""
     conn = get_db_connection()
-    conn.execute(
-        'INSERT OR REPLACE INTO cached_flows (domain, mcp_tool_sequence, last_updated) VALUES (?, ?, CURRENT_TIMESTAMP)',
-        (domain, json.dumps(mcp_tool_sequence))
-    )
+    if update_id is not None:
+        conn.execute(
+            '''UPDATE cached_flows SET initial_snapshot = ?, embedding = ?, mcp_tool_sequence = ?,
+               success_count = success_count + 1, last_updated = CURRENT_TIMESTAMP WHERE id = ?''',
+            (initial_snapshot, json.dumps(embedding), json.dumps(mcp_tool_sequence), update_id)
+        )
+    else:
+        conn.execute(
+            '''INSERT INTO cached_flows (domain, initial_snapshot, embedding, mcp_tool_sequence)
+               VALUES (?, ?, ?, ?)''',
+            (domain, initial_snapshot, json.dumps(embedding), json.dumps(mcp_tool_sequence))
+        )
     conn.commit()
     conn.close()
 

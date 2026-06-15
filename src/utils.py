@@ -18,6 +18,28 @@ def _values_match(actual: str, expected: str) -> bool:
     return bool(e2) and (e2 in a2 or a2 in e2)
 
 
+_FIELD_ROLES = {"textbox", "combobox", "checkbox", "radio", "searchbox", "textarea",
+                "listbox", "slider", "spinbutton", "switch"}
+_SNAPSHOT_LINE_RE = re.compile(r'^\s*-\s*([a-zA-Z][\w-]*)\s+"([^"]*)"')
+
+
+def extract_field_signature(snapshot: str) -> str:
+    """Extracts one "role: name" line per form-field-like element (textbox,
+    combobox, checkbox, radio, ...) from an ARIA snapshot, in document order.
+
+    This is the text that gets embedded to represent a page's form
+    "shape" for flow-variant matching: it captures which fields exist and
+    what they're asking, while dropping headings/buttons/static text/layout
+    chrome that's typically identical across variants of the same template
+    and would otherwise dilute the similarity signal."""
+    lines = []
+    for line in (snapshot or "").splitlines():
+        m = _SNAPSHOT_LINE_RE.match(line)
+        if m and m.group(1) in _FIELD_ROLES:
+            lines.append(f"{m.group(1)}: {m.group(2)}")
+    return "\n".join(lines)
+
+
 def is_final_submit(action: dict) -> bool:
     """
     Evaluates if an action is likely the final form submission button click.
