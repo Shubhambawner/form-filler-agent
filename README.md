@@ -5,67 +5,37 @@ Autonomous end-to-end job application agent. Drives a real browser via Playwrigh
 ---
 
 ```mermaid
-flowchart TD
-    START(["process_form(url)"])
-    START --> NAV["navigate · ARIA snapshot"]
-    NAV --> EMBED["embed field signature\ngemini-embedding-001"]
-    EMBED --> LOOKUP[/"find_best_flow — cosine similarity"\]
+flowchart LR
+    A(["process_form(url)"]) --> B["navigate\nARIA snapshot"]
+    B --> C["embed\nfield signature"]
+    C --> D{{"cache\nlookup"}}
 
-    LOOKUP -- "no match" --> DISC
-    LOOKUP -- "match found" --> REPLAY
+    D -- "miss" --> E["Discovery\nGemini ReAct loop"]
+    D -- "hit" --> F["Replay\n0 LLM calls"]
 
-    subgraph DISC ["  Discovery — LLM-driven  "]
-        direction TB
-        D1["snapshot ARIA tree"] --> D2["Gemini Flash\nplan action batch"]
-        D2 --> D3{"action type"}
-        D3 -- "fill · click\ncheck · upload" --> D4["Playwright\nexecute"]
-        D3 -- "combobox_select" --> SEL
-        D3 -- "needs_login" --> AUTH
+    E --> G["Selector · Login\nspecialist agents"]
+    G --> H[("save\nflow variant")]
 
-        subgraph SEL ["Selector Sub-Agent"]
-            S1{"recipe cached?"} -- yes --> S2["replay ops\n0 LLM calls"]
-            S1 -- no --> S3["ReAct loop\ndiscover op sequence"]
-            S3 --> S4["save to select_recipes"]
-        end
+    F --> I{"broken?"}
+    I -- "yes" --> J["Self-Heal\nre-discover"]
+    I -- "no" --> K
+    H --> K
+    J --> K
 
-        subgraph AUTH ["Login Agent"]
-            A1["login / signup\ncredential persistence"]
-        end
+    K(["dry_run_complete"])
 
-        D4 & S2 & S4 & A1 --> DFINAL{"final submit?"}
-        DFINAL -- no --> D1
-        DFINAL -- yes --> DSAVE["save flow variant\ncached_flows + embedding"]
-    end
-
-    subgraph REPLAY ["  Replay — deterministic, 0 LLM calls  "]
-        direction TB
-        R1["execute cached step"] --> RFAIL{"step fails?"}
-        RFAIL -- no --> RFINAL{"final submit?"}
-        RFAIL -- "recipe broken" --> RHEAL1["Selector Sub-Agent\nre-discover · stale hint"]
-        RFAIL -- "other error" --> RHEAL2["full-page self-heal\ndiscover_flow from here"]
-        RHEAL1 -- success --> RFINAL
-        RHEAL1 -- fail --> RHEAL2
-        RHEAL2 --> RSAVE["splice healed tail\nsave merged variant"]
-        RFINAL -- no --> R1
-    end
-
-    DSAVE --> DONE
-    RFINAL -- yes --> DONE
-    RSAVE --> DONE
-
-    DONE(["dry_run_complete · final.png saved"])
-
+    classDef default  fill:#f8fafc,stroke:#94a3b8,color:#1e293b
     classDef llm      fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    classDef cache    fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef replay   fill:#dcfce7,stroke:#16a34a,color:#14532d
     classDef agent    fill:#fef9c3,stroke:#ca8a04,color:#713f12
     classDef heal     fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
     classDef terminal fill:#f0fdf4,stroke:#15803d,color:#14532d,font-weight:bold
 
-    class D2,S3 llm
-    class S2,DSAVE,RSAVE cache
-    class SEL,AUTH,S1,S3,S4,A1 agent
-    class RHEAL1,RHEAL2 heal
-    class START,DONE terminal
+    class E,G llm
+    class F,H replay
+    class G agent
+    class J heal
+    class A,K terminal
 ```
 
 ---
@@ -82,3 +52,4 @@ flowchart TD
 
 → [Architecture & design decisions](docs/architecture.md)
 → [Example run — Rippling ATS, full trace](docs/example-run.md)
+
