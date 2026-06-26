@@ -80,9 +80,5 @@ flowchart TD
 
 ---
 
-![Agent filling a Visa/Workday application form](image.png)
-
----
-
 → [Architecture & design decisions](docs/architecture.md)
 → [Example run — Rippling ATS, full trace](docs/example-run.md)
