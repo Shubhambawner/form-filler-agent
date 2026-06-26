@@ -1,0 +1,62 @@
+{
+  "per_call": [
+    {
+      "iteration": 1,
+      "model": "gemini-flash-latest",
+      "prompt_token_count": 4302,
+      "candidates_token_count": 470,
+      "cached_content_token_count": null,
+      "thoughts_token_count": 1630,
+      "tool_use_prompt_token_count": null,
+      "total_token_count": 6402
+    },
+    {
+      "iteration": "1-1_step_1",
+      "model": "gemini-flash-latest",
+      "prompt_token_count": 729,
+      "candidates_token_count": 8,
+      "cached_content_token_count": null,
+      "thoughts_token_count": 248,
+      "tool_use_prompt_token_count": null,
+      "total_token_count": 985
+    },
+    {
+      "iteration": "1-1_step_2",
+      "model": "gemini-flash-latest",
+      "prompt_token_count": 984,
+      "candidates_token_count": 25,
+      "cached_content_token_count": null,
+      "thoughts_token_count": 301,
+      "tool_use_prompt_token_count": null,
+      "total_token_count": 1310
+    },
+    {
+      "iteration": "1-1_step_3",
+      "model": "gemini-flash-latest",
+      "prompt_token_count": 825,
+      "candidates_token_count": 61,
+      "cached_content_token_count": null,
+      "thoughts_token_count": 295,
+      "tool_use_prompt_token_count": null,
+      "total_token_count": 1181
+    },
+    {
+      "iteration": 2,
+      "model": "gemini-flash-latest",
+      "prompt_token_count": 5046,
+      "candidates_token_count": 33,
+      "cached_content_token_count": null,
+      "thoughts_token_count": 570,
+      "tool_use_prompt_token_count": null,
+      "total_token_count": 5649
+    }
+  ],
+  "totals": {
+    "prompt_token_count": 11886,
+    "candidates_token_count": 597,
+    "cached_content_token_count": 0,
+    "thoughts_token_count": 3044,
+    "tool_use_prompt_token_count": 0,
+    "total_token_count": 15527
+  }
+}

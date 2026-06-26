@@ -1,0 +1,20 @@
+[Executor] Logging this request's artifacts to D:\JH\form-filler-agent\src\..\data\runs\ats.rippling.com\20260619_002933
+[Browser] Launching browser...
+[Browser] Ready.
+[Browser] Navigating to https://ats.rippling.com/rippling/jobs/69b9d52d-c313-4ee1-83be-697d9b4a1a5a/apply
+[Executor] Force refresh requested for ats.rippling.com#test. Running fresh discovery...
+[Agent] Thinking... analyzing current page state for https://ats.rippling.com/rippling/jobs/69b9d52d-c313-4ee1-83be-697d9b4a1a5a/apply
+[Browser] Executing upload on button 'Drop or select (.doc / .docx / .pdf)' [nth=0] = 'D:\\autobrowser\\candidateinfo\\resume.pdf'
+[Browser] Executing fill on textbox 'First name' = 'Shubham'
+[Browser] Executing fill on textbox 'Last name' = 'Bawner'
+[Browser] Executing fill on textbox 'Email' = 'shubhambawner.official@gmail.com'
+[Browser] Executing fill on textbox 'Current company' = 'Texas Instruments'
+[Browser] Executing combobox_select on combobox 'Search' = '+91'
+[Executor] combobox_select needs the selector agent: {'action': 'combobox_select', 'role': 'combobox', 'name': 'Search', 'value': '+91'}. Discovering...
+[Browser] Executing fill on textbox 'Phone number' = '7410730191'
+[Browser] Executing fill on textbox 'Location' = 'Bengaluru, India'
+[Browser] Executing fill on textbox 'LinkedIn Link' = 'https://www.linkedin.com/in/shubham-bawner-456131205/'
+[Browser] Executing click on radio 'Yes - I consent to receiving text messages'
+[Agent] Thinking... analyzing current page state for https://ats.rippling.com/rippling/jobs/69b9d52d-c313-4ee1-83be-697d9b4a1a5a/apply
+[DRY RUN] Intercepted final submit step: {'action': 'click', 'role': 'button', 'name': 'Apply'}
+[Browser] Closed.

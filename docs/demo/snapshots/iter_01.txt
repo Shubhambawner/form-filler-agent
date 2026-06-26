@@ -1,0 +1,60 @@
+- 'heading "Application: Software Engineer 2 - AI Platform" [level=6]'
+- button "Exit to job board"
+- progressbar "Progress bar"
+- 'heading "Application: Software Engineer 2 - AI Platform" [level=4]'
+- text: Résumé* Total 0 file selected
+- button "Drop or select (.doc / .docx / .pdf)"
+- text: The résumé will be parsed to fill in the application details First name*
+- textbox "First name"
+- text: Last name*
+- textbox "Last name"
+- text: Email*
+- textbox "Email"
+- text: Pronouns
+- combobox "Pronouns"
+- text: Add pronouns to your application so interviewers know how to refer to you when talking to or about you. Current company*
+- textbox "Current company"
+- text: Phone number*
+- combobox "Search": +1 US
+- textbox "Phone number"
+- text: Location*
+- textbox "Location"
+- text: LinkedIn Link*
+- textbox "LinkedIn Link"
+- text: Cover letter Total 0 file selected
+- button "Drop or select (.doc / .docx / .pdf)"
+- paragraph:
+  - text: Check
+  - strong: "Yes"
+  - text: or
+  - strong: "No"
+  - text: to indicate your agreement to receive text message updates from Rippling regarding your job application. Frequency may vary. Message and data rates may apply. Reply HELP for assistance. Reply STOP to opt out of future messaging.
+- radiogroup:
+  - radio "Yes - I consent to receiving text messages":
+    - paragraph: Yes - I consent to receiving text messages
+  - radio "No - I do not consent to receiving text messages":
+    - paragraph: No - I do not consent to receiving text messages
+- paragraph:
+  - paragraph:
+    - link "Rippling's Immigration Policy":
+      - /url: https://www.rippling.com/immigration-policy
+  - paragraph
+  - paragraph: This posting is to fill a vacancy on our team, unless otherwise noted.
+  - paragraph:
+    - text: By clicking "Apply" you agree to
+    - link "Rippling's Employees, Candidates, and Workers Privacy Notice":
+      - /url: https://app.rippling.com/legal/employee-privacy
+    - text: .
+  - paragraph
+  - text: By clicking "Apply" you agree to Rippling's
+  - link "Terms of Service":
+    - /url: https://app.rippling.com/legal/user
+  - text: and
+  - link "User Privacy Notice.":
+    - /url: https://app.rippling.com/legal/privacy
+    - text: User Privacy Notice
+    - link ".":
+      - /url: https://app.rippling.com/legal/privacy
+- paragraph
+- button "Apply" [disabled]
+- alert: Apply - Software Engineer 2 - AI Platform

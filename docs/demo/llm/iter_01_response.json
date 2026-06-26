@@ -1,0 +1,62 @@
+[
+  {
+    "action": "upload",
+    "role": "button",
+    "name": "Drop or select (.doc / .docx / .pdf)",
+    "value": "D:\\autobrowser\\candidateinfo\\resume.pdf",
+    "nth": 0
+  },
+  {
+    "action": "fill",
+    "role": "textbox",
+    "name": "First name",
+    "value": "Shubham"
+  },
+  {
+    "action": "fill",
+    "role": "textbox",
+    "name": "Last name",
+    "value": "Bawner"
+  },
+  {
+    "action": "fill",
+    "role": "textbox",
+    "name": "Email",
+    "value": "shubhambawner.official@gmail.com"
+  },
+  {
+    "action": "fill",
+    "role": "textbox",
+    "name": "Current company",
+    "value": "Texas Instruments"
+  },
+  {
+    "action": "combobox_select",
+    "role": "combobox",
+    "name": "Search",
+    "value": "+91"
+  },
+  {
+    "action": "fill",
+    "role": "textbox",
+    "name": "Phone number",
+    "value": "7410730191"
+  },
+  {
+    "action": "fill",
+    "role": "textbox",
+    "name": "Location",
+    "value": "Bengaluru, India"
+  },
+  {
+    "action": "fill",
+    "role": "textbox",
+    "name": "LinkedIn Link",
+    "value": "https://www.linkedin.com/in/shubham-bawner-456131205/"
+  },
+  {
+    "action": "click",
+    "role": "radio",
+    "name": "Yes - I consent to receiving text messages"
+  }
+]
