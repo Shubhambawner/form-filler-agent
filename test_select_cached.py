@@ -11,11 +11,11 @@ from src.executor import process_form
 from test_inputs import TARGET_URL, TEST_DOMAIN
 
 
-async def main():
+async def main() -> str:
     init_db()
     if not os.environ.get("GEMINI_API_KEY"):
         print("ERROR: GEMINI_API_KEY not found. Please ensure your .env file exists in the root directory.")
-        return
+        return "error"
 
     print(f"--- Select-cached flow discovery (isolated cache: {TEST_DOMAIN}) ---")
     print(f"Target: {TARGET_URL}")
@@ -24,8 +24,8 @@ async def main():
     # Combobox actions should hit exact-cache select-recipe hits (populated
     # by test_full_discovery.py) and need no LLM calls.
     result = await process_form(TARGET_URL, force_refresh=True, cache_domain=TEST_DOMAIN)
-    if result["status"] == "healed_needs_restart":
-        print("--- Restarting with Healed Flow ---")
+    if result["status"] in ("healed_needs_restart", "needs_restart"):
+        print(f"--- Restarting ({result['status']}) ---")
         result = await process_form(TARGET_URL, cache_domain=TEST_DOMAIN)
 
     print(f"--- Discovery Result: {result['status']} ---")
@@ -40,9 +40,25 @@ async def main():
     assert variant["success_count"] >= 2, f"expected success_count >= 2 (updated in place), got {variant['success_count']}"
     print(f"  cached_flows: 1 variant (id={variant['id']}, success_count={variant['success_count']})")
 
+    return result["status"]
+
 
 if __name__ == "__main__":
     if os.name == 'nt':
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-    asyncio.run(main())
+    _exit_code = 0
+    _status = None
+    try:
+        _status = asyncio.run(main())
+    except Exception as e:
+        print(f"FAILED: {e}")
+        _exit_code = 1
+
+    if _status == "dry_run_complete":
+        try:
+            input("\nBrowser is open for inspection. Press Enter to close it and exit...")
+        except (KeyboardInterrupt, EOFError):
+            pass
+
+    os._exit(_exit_code)

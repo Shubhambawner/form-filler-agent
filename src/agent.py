@@ -14,7 +14,23 @@ client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 MODEL_NAME = 'gemini-flash-latest'
 
-def build_system_prompt(target_url: str, snapshot: str, previous_actions: list = None, error_context: dict = None) -> str:
+def build_system_prompt(target_url: str, snapshot: str, previous_actions: list = None,
+                        error_context: dict = None, domain_creds: dict = None,
+                        network_activity: list = None) -> str:
+    if domain_creds:
+        creds_lines = "\n".join(f"      {k}: {v['value']}" for k, v in domain_creds.items())
+        _login_wall = (
+            "Stored credentials for this site:\n" + creds_lines + "\n"
+            "    If the current page is a login screen, fill these credentials and submit"
+            " like any other form. After submitting, continue filling the application form."
+        )
+    else:
+        _login_wall = (
+            'If the current page is a login gate or account-creation screen that must be passed\n'
+            '    before the application form, return EXACTLY:\n'
+            '      [{"action": "needs_login"}]\n'
+            '    as your only action. A specialist agent handles credential creation.'
+        )
     prompt = f"""
     You are an expert form-filling agent. You operate on ONE page of a web form at a time,
     using a Playwright-driven browser. You will be shown an accessibility-tree snapshot of the
@@ -22,15 +38,32 @@ def build_system_prompt(target_url: str, snapshot: str, previous_actions: list =
 
     ### ACTION SCHEMA ###
     Return a JSON array of action objects, each shaped like:
-      {{"action": "fill" | "select" | "combobox_select" | "click" | "check" | "uncheck" | "upload", "role": "<ARIA role from the snapshot, e.g. textbox, button, combobox, checkbox>", "name": "<exact accessible name from the snapshot>", "value": "<text to fill / option to select / absolute file path to upload>", "nth": <optional 0-based index>}}
+      {{"action": "fill" | "select" | "combobox_select" | "click" | "check" | "uncheck" | "upload", "role": "<ARIA role from the snapshot, e.g. textbox, button, combobox, checkbox>", "name": "<exact accessible name from the snapshot>", "value": "<text to fill / option to select / absolute file path to upload>", "nth": <optional 0-based index>, "is_final": <true only on the very last submit action>}}
     "value" is omitted for "click", "check", and "uncheck" actions.
     "nth" is optional and only needed when MULTIPLE elements in the snapshot share the exact same
     role and accessible name (e.g. two "Drop or select..." upload buttons, one for resume and one
     for cover letter). Count occurrences of that (role, name) pair in top-to-bottom document order
     starting at 0, and set "nth" to the index of the one you mean.
+    "is_final" must be set to true ONLY on the single click action that submits the ENTIRE
+    application (e.g. "Submit Application", "Apply", "Finish"). Never set it on navigation
+    buttons ("Next", "Continue"), cookie banners ("Accept Cookies"), intermediate steps
+    ("Apply Manually", "Sign In", "Create Account"), or any action that is not the true
+    final submission. Omit "is_final" (or set it to false) on every other action.
+
+    To pause while the page loads or processes something, return a wait action:
+      {{"action": "wait", "seconds": <1-5>}}
+    Maximum 5 seconds per wait. Use this instead of returning an empty array when
+    the page is transitioning or a button is still disabled/loading.
 
     ### ACTION TYPE GUIDE ###
     - "fill": type text into a "textbox" or "textarea".
+    - "wait": pause for 1-5 seconds while the page loads or a button becomes enabled.
+    - "screenshot": capture a visual screenshot — the image will be shown to you on the very
+      next iteration alongside the ARIA snapshot. Use when the accessibility tree alone is
+      not enough to understand what is on screen (e.g. visual-only content, ambiguous state).
+      Return as the sole action: [{{"action": "screenshot"}}]
+    - "reload": hard-reload the current page. Use when the page appears stuck, shows stale
+      content, or needs a clean restart. Return as the sole action: [{{"action": "reload"}}]
     - "select": choose an option in a NATIVE HTML <select> dropdown.
     - "combobox_select": choose an option in a CUSTOM/searchable dropdown widget (role "combobox"
       that is not a native <select>, e.g. a react-select style picker). A specialist sub-agent
@@ -64,9 +97,20 @@ def build_system_prompt(target_url: str, snapshot: str, previous_actions: list =
     7. ONLY when every field on this page is correctly filled AND the single remaining step is the
        FINAL submission button for the entire application (e.g. "Submit Application", "Submit",
        "Apply", "Finish"), return a JSON array containing EXACTLY ONE action: the click on that
-       button, and nothing else.
-    8. If there is truly nothing left to do on this page (no empty/placeholder fields, and no
-       button to advance), return an empty JSON array [].
+       button with "is_final": true, and nothing else.
+    8. NEVER include the final submit action in the same batch as any form-filling or other
+       actions. Always return all fills/clicks first, then on the very next turn return the
+       submit action alone. Even if only 1-2 fields remain alongside the submit button, fill
+       them first and let the submit be intercepted on the following turn.
+    9. Prefer filling fields manually over using resume/profile autofill buttons ("Autofill
+       with Resume", "Import from LinkedIn", etc.) — autofill triggers background processing
+       that requires unpredictable waits and may not populate all fields correctly.
+    10. If the page is still loading or a button is temporarily disabled, return a wait action
+       (1-5 seconds) rather than an empty array. Only return an empty array [] when there is
+       genuinely nothing left to do and no button to advance.
+
+    ### LOGIN / SIGNUP WALL ###
+    {_login_wall}
 
     ### PROFILE DATA ###
     {json.dumps(PROFILE_DATA, indent=2)}
@@ -91,6 +135,16 @@ def build_system_prompt(target_url: str, snapshot: str, previous_actions: list =
         {json.dumps(previous_actions, indent=2)}
         """
 
+    if network_activity:
+        lines = "\n".join(f"  {r['method']} {r['path']} → {r['status']}" for r in network_activity)
+        prompt += f"""
+        \n### NETWORK ACTIVITY FROM PREVIOUS ACTIONS ###
+        The following same-domain backend requests were triggered by the last batch of actions.
+        Use this to infer page-state changes (e.g. login completed, autofill data fetched,
+        form section saved) that may not yet be reflected in the snapshot:
+        {lines}
+        """
+
     # Self-Healing Context Injection
     if error_context:
         prompt += f"""
@@ -113,14 +167,23 @@ def build_system_prompt(target_url: str, snapshot: str, previous_actions: list =
         """
     return prompt
 
-async def run_react_agent(url: str, snapshot: str, previous_actions: list = None, error_context: dict = None, logger=None, iteration: int = None) -> list:
+async def run_react_agent(url: str, snapshot: str, previous_actions: list = None,
+                          error_context: dict = None, logger=None, iteration: int = None,
+                          domain_creds: dict = None, network_activity: list = None,
+                          screenshot_data: bytes = None) -> list:
     """Calls Gemini to generate the next batch of actions for the current page state."""
     print(f"[Agent] Thinking... analyzing current page state for {url}")
 
-    prompt = build_system_prompt(url, snapshot, previous_actions, error_context)
+    prompt = build_system_prompt(url, snapshot, previous_actions, error_context, domain_creds, network_activity)
+
+    if screenshot_data:
+        contents = [prompt, types.Part.from_bytes(data=screenshot_data, mime_type="image/png")]
+    else:
+        contents = prompt
+
     response = client.models.generate_content(
         model=MODEL_NAME,
-        contents=prompt,
+        contents=contents,
         config=types.GenerateContentConfig(response_mime_type="application/json")
     )
 

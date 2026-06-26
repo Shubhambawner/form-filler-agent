@@ -1,6 +1,31 @@
 import os
+import sys
 import json
 from datetime import datetime
+
+
+class _Tee:
+    """Duplicates writes to both the original stream and a log file so that
+    all print() output goes to the console AND data/runs/.../log.log."""
+    def __init__(self, original, log_file):
+        self._orig = original
+        self._file = log_file
+
+    def write(self, data):
+        self._orig.write(data)
+        self._file.write(data)
+        self._file.flush()
+
+    def flush(self):
+        self._orig.flush()
+        self._file.flush()
+
+    def isatty(self):
+        return False
+
+    def fileno(self):
+        return self._orig.fileno()
+
 
 class RunLogger:
     """Captures per-request artifacts (snapshots, LLM prompts/responses, token & $ costs)
@@ -16,6 +41,17 @@ class RunLogger:
 
         self._iteration = 0
         self.usage_entries = []
+
+        # Tee stdout so every print() in this process also lands in log.log.
+        self._log_file = open(os.path.join(self.run_dir, "log.log"), "w", encoding="utf-8")
+        self._original_stdout = sys.stdout
+        sys.stdout = _Tee(sys.stdout, self._log_file)
+
+    def close(self):
+        """Restore stdout and flush/close the log file."""
+        if isinstance(sys.stdout, _Tee):
+            sys.stdout = self._original_stdout
+        self._log_file.close()
 
     def next_iteration(self) -> int:
         self._iteration += 1

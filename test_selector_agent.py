@@ -124,4 +124,11 @@ async def main():
 if __name__ == "__main__":
     if os.name == "nt":
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-    asyncio.run(main())
+
+    _exit_code = 0
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        print(f"FAILED: {e}")
+        _exit_code = 1
+    os._exit(_exit_code)

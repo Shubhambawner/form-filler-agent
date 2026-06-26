@@ -53,12 +53,25 @@ def is_final_submit(action: dict) -> bool:
     if re.search(r'next|continue|back', name):
         return False
 
-    # Identify final submission intent
-    return bool(re.search(r'submit|done|ok|confirm|finish|place order|register|apply', name))
+    # `is_final` must be explicitly set by the agent — without it the regex
+    # alone is not checked (prevents false positives on e.g. "Accept Cookies").
+    if not action.get('is_final'):
+        return False
+
+    # Each keyword must be a whole "word" in the button label: surrounded by
+    # a space or the start/end of the string.  This stops "ok" matching inside
+    # "cookies", "apply" matching "apply manually", etc.
+    return bool(re.search(r'(?:^|\s)(?:submit|done|ok|confirm|finish|place order|register|apply)(?:\s|$)', name))
 
 def flow_has_final_submit(flow_sequence: list) -> bool:
     """Checks whether a flow sequence contains a final form submission step."""
     return any(is_final_submit(action) for action in flow_sequence)
+
+def is_needs_login(action: dict) -> bool:
+    return action.get("action") == "needs_login"
+
+def flow_has_needs_login(flow_sequence: list) -> bool:
+    return any(is_needs_login(a) for a in flow_sequence)
 
 def mask_sensitive_data(mcp_sequence: list) -> list:
     """

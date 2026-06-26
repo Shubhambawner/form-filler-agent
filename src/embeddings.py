@@ -5,6 +5,8 @@ EMBED_MODEL = "gemini-embedding-001"
 
 def embed_text(text: str) -> list:
     """Returns the embedding vector for `text` as a list of floats."""
+    if not text or not text.strip():
+        raise ValueError("embed_text called with empty text")
     response = client.models.embed_content(model=EMBED_MODEL, contents=text)
     return response.embeddings[0].values
 

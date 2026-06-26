@@ -12,7 +12,11 @@ test_selector_agent.py exercises the selector agent directly (no main agent)
 isolation.
 """
 
-TARGET_URL = "https://job-boards.greenhouse.io/hackerrank/jobs/7907492"
+# TARGET_URL = "https://careers-kinaxis.icims.com/jobs/34911/forward-deployed-engineer%2c-transformation/job" # failsbe cause of hcapcha
+
+TARGET_URL = "https://visa.wd5.myworkdayjobs.com/Visa/job/IN---Bengaluru-India/Software-Engineer--AI-Engineer--Python--1-2-years--experience-only-_REF082785W/apply"
+# TARGET_URL = "https://ats.rippling.com/rippling/jobs/69b9d52d-c313-4ee1-83be-697d9b4a1a5a/apply"
+# TARGET_URL = "https://job-boards.greenhouse.io/hackerrank/jobs/7907492"
 REAL_DOMAIN = TARGET_URL.split("//")[-1].split("/")[0]
 
 TEST_DOMAIN = REAL_DOMAIN + "#test"
@@ -21,10 +25,6 @@ TEST_DOMAIN = REAL_DOMAIN + "#test"
 # with. Used by test_full_discovery.py (to force-clear their select_recipes
 # before a full re-discovery) and test_selector_agent.py (to exercise
 # selector_agent.resolve() directly for each one).
-SELECT_FIELDS = [
-    # (role, name, value, nth)
-    ("combobox", "Country", "India", None),
-    ("combobox", "How many years of experience do you have as a DevRel Engineer?", "2", None),
-    ("combobox", "Would you be open to relocating to Bangalore?", "Yes", None),
-    ("combobox", "How long is your notice period?", "2 months", None),
-]
+# TODO: populate with the actual combobox fields from the Kinaxis iCIMS form
+# once a full discovery run completes and the form layout is known.
+SELECT_FIELDS = []

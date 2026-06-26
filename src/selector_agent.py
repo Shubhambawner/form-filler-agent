@@ -106,6 +106,42 @@ this field is likely looking for (e.g. how a value like this maps to an option's
 """ + "\n".join(hint_lines) + "\n")
 
     parts.append(f"""
+### DISCOVERY STRATEGIES ###
+Widgets vary widely. If the basic sequence (click_target → type → click_option) does not work,
+try these escalating approaches — in order:
+
+1. TYPE VARIATIONS — if typing the full value shows no options:
+   - clear, then type just the first 1-3 characters (autocomplete often triggers earlier)
+   - type a single space or press Backspace once after typing to re-trigger the dropdown
+   - try a different substring (e.g. middle of the value, not the start)
+
+2. KEYBOARD TRIGGERS — if typing alone doesn't open the list:
+   - press ArrowDown immediately after click_target (opens many native-style pickers)
+   - press Space to toggle/expand the widget without typing
+   - press Enter after typing to fire a search/lookup (search-style comboboxes)
+
+3. OPTION NOT VISIBLE IN LOCAL SNAPSHOT:
+   - use request_full_snapshot — some widgets render their option list in a DOM portal far
+     from the widget itself (react-select, Workday-style overlays); the full snapshot will
+     reveal it
+   - if you can see the list but not the exact option, try a shorter/different search term
+   - look in the local snapshot for a nearby "Search" button or magnifying-glass icon and
+     click it (some widgets need an explicit trigger)
+
+4. RECOVERY / RESET:
+   - press Escape to close a stuck or stale dropdown, then restart from click_target
+   - clear + click_target to get back to a clean open state before retrying
+
+5. KEYBOARD ACCEPTANCE:
+   - if the desired option is highlighted in the list (visible in transcript/snapshot),
+     pressing Enter often selects it — try this before click_option
+   - Tab after typing sometimes confirms the typed value in plain-text comboboxes
+
+6. TRANSCRIPT CHECK:
+   - if a previous op in the transcript already shows the option list, use click_option
+     with the EXACT text that appeared (match capitalisation, accents, punctuation)
+   - never invent option text that was not visible in a snapshot
+
 ### OP VOCABULARY -- return EXACTLY ONE of the following as a JSON object ###
 {OP_VOCABULARY}
 """)
