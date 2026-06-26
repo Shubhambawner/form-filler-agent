@@ -8,6 +8,137 @@ The core design goal is **run-cost asymmetry**: the first run against a form doe
 
 ---
 
+## Example Run — Rippling ATS (Discovery Mode)
+
+A complete trace of a real discovery run against `ats.rippling.com` — **2 main-agent iterations, 3 selector-agent steps, 15,527 tokens total, dry-run complete in one pass.**
+
+<details>
+<summary><strong>Iteration 1 — Agent sees blank form, plans 10 actions</strong></summary>
+
+**ARIA snapshot the agent receives (`snapshots/iter_01.txt`):**
+```
+- heading "Application: Software Engineer 2 - AI Platform"
+- button "Exit to job board"
+- progressbar "Progress bar"
+- text: Résumé* Total 0 file selected
+- button "Drop or select (.doc / .docx / .pdf)"
+- textbox "First name"
+- textbox "Last name"
+- textbox "Email"
+- combobox "Pronouns"
+- textbox "Current company"
+- combobox "Search": +1 US         ← phone country code, wrong default
+- textbox "Phone number"
+- textbox "Location"
+- textbox "LinkedIn Link"
+- button "Drop or select (.doc / .docx / .pdf)"   ← cover letter
+- radiogroup:
+  - radio "Yes - I consent to receiving text messages"
+  - radio "No - I do not consent to receiving text messages"
+- button "Apply" [disabled]
+```
+
+**Agent decision (`llm/iter_01_response.json`) — 6,402 tokens:**
+```json
+[
+  { "action": "upload",           "role": "button",   "name": "Drop or select (.doc / .docx / .pdf)", "value": "D:\\...\\resume.pdf", "nth": 0 },
+  { "action": "fill",             "role": "textbox",  "name": "First name",     "value": "Shubham" },
+  { "action": "fill",             "role": "textbox",  "name": "Last name",      "value": "Bawner" },
+  { "action": "fill",             "role": "textbox",  "name": "Email",          "value": "shubhambawner.official@gmail.com" },
+  { "action": "fill",             "role": "textbox",  "name": "Current company","value": "Texas Instruments" },
+  { "action": "combobox_select",  "role": "combobox", "name": "Search",         "value": "+91" },
+  { "action": "fill",             "role": "textbox",  "name": "Phone number",   "value": "7410730191" },
+  { "action": "fill",             "role": "textbox",  "name": "Location",       "value": "Bengaluru, India" },
+  { "action": "fill",             "role": "textbox",  "name": "LinkedIn Link",  "value": "https://www.linkedin.com/in/shubham-bawner-456131205/" },
+  { "action": "click",            "role": "radio",    "name": "Yes - I consent to receiving text messages" }
+]
+```
+
+The `combobox_select` on `"Search"` triggers the selector sub-agent (see below). All other actions execute directly via Playwright.
+
+</details>
+
+<details>
+<summary><strong>Selector sub-agent — discovering how to set the phone country code to +91 (3 steps)</strong></summary>
+
+The `"Search"` combobox is a custom widget (not a native `<select>`). The sub-agent explores it in a ReAct loop, emitting one primitive op per turn.
+
+**Step 1 — `llm/iter_1-1_step_1_response.json` (985 tokens):**
+```json
+{ "op": "click_target" }
+```
+Clicks the combobox to open the dropdown.
+
+**Step 2 — `llm/iter_1-1_step_2_response.json` (1,310 tokens):**
+```json
+{ "op": "click_option", "label": "+91 IN - India" }
+```
+Local snapshot after `click_target` showed the option list. Agent clicks the exact label.
+
+**Step 3 — `llm/iter_1-1_step_3_response.json` (1,181 tokens):**
+```json
+{
+  "op": "done",
+  "chosen_label": "+91 IN",
+  "description": "Clicked the combobox and selected the '+91 IN - India' option, which is now successfully displayed as '+91 IN' in the combobox."
+}
+```
+Verification passes (`+91 IN` is present in the field context). **Recipe `[click_target, click_option "+91 IN - India"]` is saved to `select_recipes`.** Future runs for the same field replay this directly with zero LLM calls.
+
+</details>
+
+<details>
+<summary><strong>Iteration 2 — Agent verifies filled state, returns final submit</strong></summary>
+
+**ARIA snapshot the agent receives (`snapshots/iter_02.txt`) — every field now populated:**
+```
+- text: Résumé* Total 1 file selected
+- status: File resume.pdf uploaded successfully
+- textbox "First name": Shubham
+- textbox "Last name": Bawner
+- textbox "Email": shubhambawner.official@gmail.com
+- textbox "Current company": Texas Instruments
+- combobox "Search": +91 IN          ← corrected from +1 US
+- textbox "Phone number": 74107 30191
+- textbox "Location": Bengaluru, India
+- textbox "LinkedIn Link": https://www.linkedin.com/in/shubham-bawner-456131205/
+- radio "Yes - I consent to receiving text messages" [checked]
+- button "Apply"                      ← now enabled
+```
+
+**Agent decision (`llm/iter_02_response.json`) — 5,649 tokens:**
+```json
+[{ "action": "click", "role": "button", "name": "Apply" }]
+```
+
+`is_final_submit()` intercepts this (lone submit button action), takes a screenshot, and returns `dry_run_complete` **without clicking**. The complete action sequence is stored as a flow variant.
+
+</details>
+
+<details>
+<summary><strong>Final screenshot + token summary</strong></summary>
+
+**`final.png` — captured at the moment of interception:**
+
+![Rippling application form fully filled, Apply button ready](data/runs/ats.rippling.com/20260619_002933/final.png)
+
+**Token usage (`token_usage.json`):**
+
+| Call | Role | Tokens |
+|------|------|--------|
+| iter 1 — main agent | Plans 10 actions from blank form | 6,402 |
+| iter 1-1 step 1 — selector agent | `click_target` | 985 |
+| iter 1-1 step 2 — selector agent | `click_option "+91 IN - India"` | 1,310 |
+| iter 1-1 step 3 — selector agent | `done` + verification | 1,181 |
+| iter 2 — main agent | Sees filled form, returns submit | 5,649 |
+| **Total** | | **15,527** |
+
+Next run against the same form: **0 LLM calls** — the flow variant and the `+91` recipe both replay from cache.
+
+</details>
+
+---
+
 ## How It Works
 
 ### Two-Phase Execution
