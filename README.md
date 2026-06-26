@@ -1,8 +1,16 @@
 # Form Filler Agent
 
-An autonomous agent that fills out job-application forms end-to-end — Greenhouse, Workday, Rippling, iCIMS, and others — using a Playwright-driven browser and Gemini Flash as the reasoning engine.
+Autonomous end-to-end job application agent. Drives a real browser via Playwright, reasons over ARIA accessibility trees with Gemini Flash, and fills forms across Greenhouse, Workday, Rippling, iCIMS, and others.
 
-The core design goal is **run-cost asymmetry**: the first run against a form does full LLM reasoning (discovery); every subsequent run replays a cached action sequence with zero LLM calls. A self-healing layer ensures the cache stays valid as forms change.
+The system is built around four ideas:
+
+**Discovery then caching.** The first run against a form is LLM-driven: a ReAct loop snapshots the page, asks the model what to do, executes the actions, and repeats until the final submit button is reached. That entire action transcript is stored. Every subsequent run replays it deterministically — zero LLM calls, sub-second execution.
+
+**Separation of concerns via specialist agents.** The main agent handles page-level reasoning. Custom dropdown widgets (react-select, Workday overlays) are delegated to a *selector sub-agent* that discovers and caches a literal-op recipe for each field — `click_target → click_option "+91 IN - India" → done` — so future encounters replay the recipe without touching the model. Auth gates (login/signup screens) are handed off to a *login agent* that handles credentials, account creation, and OTP escalation, keeping auth complexity entirely out of the main agent's context.
+
+**RAG-based snapshot matching for re-runs.** A single ATS domain hosts thousands of job listings with varying field sets. Rather than one cached flow per domain, each discovered flow is stored with an embedding of its initial ARIA snapshot. On re-entry, the closest-matching stored variant is retrieved by cosine similarity — robust to job-title interpolation in field names, sensitive to genuinely different field sets. The same embedding index powers the selector agent's hint system: sibling fields discovered earlier in the same run surface as ranked hints for later fields.
+
+**Self-heal based re-discovery.** When replay breaks — a recipe fails, a field changes shape, a new required field appears — the system doesn't abort. It attempts field-level re-discovery first (surgical repair, single LLM call). If that fails, it re-runs discovery from the current page with the failure as context, splices the healed tail onto the already-executed prefix, and saves the merged flow as an updated variant.
 
 ![Agent filling a Visa/Workday job application form](image.png)
 
